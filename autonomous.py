@@ -52,22 +52,22 @@ def process_image(l_img, gr_img):
 
     disparity_map = calc_disparity_map(gl_img, gr_img)
 
-    distances = [calc_depth(disparity_map, obj_class) for obj_class in objects]
+    distances = [calc_depth(disparity_map, box) for (_, box) in objects]
 
     return objects, distances
 
 
 def run_simulation():
-    l_imgs_path = join(master_path_to_dataset, "left-images")
-    r_imgs_path = join(master_path_to_dataset, "right-images")
+    l_imgs_folder = join(master_path_to_dataset, "left-images")
+    r_imgs_folder = join(master_path_to_dataset, "right-images")
     processed_imgs_path = join(master_path_to_dataset, "processed")
 
     # Useful NB: Images are passed by reference
-    for l_img_name in os.listdir(l_imgs_path):
+    for l_img_name in os.listdir(l_imgs_folder):
         print("--------- Processing ", l_img_name)
         r_img_name = l_img_name.replace("L", "R")
 
-        l_img, r_img = cv2.imread(join(l_imgs_path, l_img_name)), cv2.imread(join(r_imgs_path, r_img_name), 0)
+        l_img, r_img = cv2.imread(join(l_imgs_folder, l_img_name)), cv2.imread(join(r_imgs_folder, r_img_name), 0)
 
         objects, distances = process_image(l_img.copy(), r_img)
 

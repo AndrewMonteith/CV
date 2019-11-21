@@ -12,7 +12,7 @@ stereoProcessor = cv2.StereoSGBM_create(0, max_disparity, 21)  # 21 is block siz
 def calc_disparity_map(gl_img, gr_img):
     disparity = stereoProcessor.compute(gl_img, gr_img)
 
-    dispNoiseFilter = 10  # increase for more agressive filtering
+    dispNoiseFilter = 8  # increase for more agressive filtering
     cv2.filterSpeckles(disparity, 0, 4000, max_disparity - dispNoiseFilter)
 
     _, disparity = cv2.threshold(disparity, 0, max_disparity * 16, cv2.THRESH_TOZERO)
@@ -25,16 +25,20 @@ def take_subarray(arr, x, y, w, h):
 
     return arr[max(y, 0):min(y + h + 1, arr_h), max(x, 0):min(x + w + 1, arr_w)]
 
+def non_zero_mean(disparities):
+    return disparities.sum() / np.count_nonzero(disparities)
 
-def calc_depth(disparity, obj_class):
+def kth_nonzero_percentile(disparities, k):
+    return np.percentile(disparities[disparities != 0], k)
 
-    feature_disparities = take_subarray(disparity, *obj_class[1])
+# Compute Average depth based on mean of non-zero disparities
+def calc_depth(disparity, box):
+    feature_disparities = take_subarray(disparity, *box)
 
     if not np.any(feature_disparities):
         return -1
 
-    # Mean of non-zero disparities. Need to think about improving this?
-    feature_disparity = feature_disparities.sum() / np.count_nonzero(feature_disparities)
+    feature_disparity = kth_nonzero_percentile(feature_disparities, 80)
 
     focal_length = 399.9745178222656
     baseline_dist = 0.2090607502
