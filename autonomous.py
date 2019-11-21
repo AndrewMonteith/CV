@@ -1,19 +1,13 @@
-import ntpath
 import os
 
 import cv2
+from os.path import join
 
-from densedisparitydistance import calculate_distance
+from densedisparitydistance import calc_disparity_map, calc_depth
+from preprocessing import prp_dist_calc_input, prp_obj_detection_input
 from yoloimg import yolo_detect
 
-
-def does_folder_exist(path, folder_name):
-    folder_path = os.path.join(path, folder_name)
-
-    return os.path.exists(folder_path) and os.path.isdir(folder_path)
-
-
-master_path_to_dataset = "C:\\Users\\Hp\\Downloads\\TTBB-shorter"
+master_path_to_dataset = "C:\\Users\\Hp\\Downloads\\TTBB - Bad"
 
 
 # image: image detection performed on
@@ -47,97 +41,40 @@ def annotate_image(left_img, objects, distances):
         draw_box(left_img, obj_class, distances[i], *box)
 
 
-def get_folder_paths():
-    left_images_path = os.path.join(master_path_to_dataset, "left-images")
-    right_images_path = os.path.join(master_path_to_dataset, "right-images")
+def process_image(l_img, gr_img):
+    prp_obj_detection_input(l_img)
 
-    return left_images_path, right_images_path
+    gl_img = cv2.cvtColor(l_img, cv2.COLOR_BGR2GRAY)
+    prp_dist_calc_input(gl_img, gr_img)
 
+    # array of (<class-match>, <box>)
+    objects = yolo_detect(l_img)
 
-def setup_simulation_environment():
-    """
-        Make sure the right folders are there
-        Creates an output directory for all processed images
-    """
-    l_imgs_path, r_imgs_path = get_folder_paths()
+    disparity_map = calc_disparity_map(gl_img, gr_img)
 
-    if not (os.path.isdir(l_imgs_path) and os.path.isdir(r_imgs_path)):
-        raise Exception("Failed to run simulation, folder did not contain left-images and right-images folder")
+    distances = [calc_depth(disparity_map, obj_class) for obj_class in objects]
 
-    processed_img_dir = os.path.join(master_path_to_dataset, "processed")
-    if os.path.exists(processed_img_dir):
-        for file in os.listdir(processed_img_dir):
-            os.remove(os.path.join(processed_img_dir, file))
-    else:
-        os.mkdir(processed_img_dir)
-
-    return processed_img_dir
+    return objects, distances
 
 
-def all_image_pairs():
-    l_imgs_path, r_imgs_path = get_folder_paths()
+def run_simulation():
+    l_imgs_path = join(master_path_to_dataset, "left-images")
+    r_imgs_path = join(master_path_to_dataset, "right-images")
+    processed_imgs_path = join(master_path_to_dataset, "processed")
 
+    # Useful NB: Images are passed by reference
     for l_img_name in os.listdir(l_imgs_path):
+        print("--------- Processing ", l_img_name)
         r_img_name = l_img_name.replace("L", "R")
 
-        l_img_path = os.path.join(l_imgs_path, l_img_name)
-        r_img_path = os.path.join(r_imgs_path, r_img_name)
+        l_img, r_img = cv2.imread(join(l_imgs_path, l_img_name)), cv2.imread(join(r_imgs_path, r_img_name), 0)
 
-        yield l_img_path, r_img_path
-
-
-def run_simulation(preprocess_image, detect_objects, estimate_distance):
-    """
-    Runs a simulation pass over the images contained in master_path_to_data
-    :param preprocess_image: Function that takes a pair of images and performs any
-                          preprocessing on them to make object detection easier
-    :param detect_objects: Function that takes colour image and detects
-                             any dynamic objects in them
-    :param estimate_distance: Function that takes a pair of images and objects
-                                we detected in them and attempts to determine the
-                                distance between them
-    """
-
-    output_folder = setup_simulation_environment()
-
-    def process_image(l_img, r_img):
-        preprocessed_l_img = preprocess_image(l_img)
-
-        objects = detect_objects(preprocessed_l_img)
-
-        distances = [estimate_distance(l_img, r_img, box) for (_, box) in objects]
+        objects, distances = process_image(l_img.copy(), r_img)
 
         annotate_image(l_img, objects, distances)
 
-        return l_img
-
-    for l_img_path, r_img_path in all_image_pairs():
-        print("Processing image ", l_img_path)
-        l_img, r_img = cv2.imread(l_img_path), cv2.imread(r_img_path)
-
-        annotated_image = process_image(l_img, r_img)
-
-        cv2.imwrite(os.path.join(output_folder, ntpath.basename(l_img_path)), annotated_image)
-
-
-def no_preprocessing(left_img):
-    return left_img
+        cv2.imwrite(join(processed_imgs_path, l_img_name), l_img)
 
 
 if __name__ == "__main__":
-    run_simulation(no_preprocessing, yolo_detect, calculate_distance)
-
-# Code to a file of images into a video
-# img_arr = os.listdir(os.path.join(master_path_to_dataset, "left-images"))
-# img_array = []
-# size = None
-# for filename in img_arr:
-#     img = cv2.imread(os.path.join(master_path_to_dataset, "left-images", filename))
-#     height, width, layers = img.shape
-#     size = (width, height)
-#     img_array.append(img)
-# out = cv2.VideoWriter('project.avi', cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
-#
-# for i in range(len(img_array)):
-#     out.write(img_array[i])
-# out.release()
+    run_simulation()
