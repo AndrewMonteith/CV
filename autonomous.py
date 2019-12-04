@@ -2,8 +2,9 @@ import os
 
 import cv2
 from os.path import join
+import time
 
-from densedisparitydistance import calc_disparity_map, calc_depth
+from disparitymaps import calc_sgbm_disp_map, calc_orb_disp_map, calc_depth
 from preprocessing import prp_dist_calc_input, prp_obj_detection_input
 from yoloimg import yolo_detect
 
@@ -42,7 +43,7 @@ def annotate_image(left_img, objects, distances):
 
 
 def process_image(l_img, gr_img):
-    prp_obj_detection_input(l_img)
+    prp_obj_detection_input(l_img, gr_img)
 
     gl_img = cv2.cvtColor(l_img, cv2.COLOR_BGR2GRAY)
     prp_dist_calc_input(gl_img, gr_img)
@@ -50,12 +51,16 @@ def process_image(l_img, gr_img):
     # array of (<class-match>, <box>)
     objects = yolo_detect(l_img)
 
-    disparity_map = calc_disparity_map(gl_img, gr_img)
+    disparity_map = calc_orb_disp_map(gl_img, gr_img)
 
     distances = [calc_depth(disparity_map, box) for (_, box) in objects]
 
-    return objects, distances
+    return objects, distances, disparity_map
 
+def false_colour(image):
+    image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
+    image = image.astype('uint8')
+    return cv2.applyColorMap(image, cv2.COLORMAP_BONE)
 
 def run_simulation():
     l_imgs_folder = join(master_path_to_dataset, "left-images")
@@ -69,11 +74,12 @@ def run_simulation():
 
         l_img, r_img = cv2.imread(join(l_imgs_folder, l_img_name)), cv2.imread(join(r_imgs_folder, r_img_name), 0)
 
-        objects, distances = process_image(l_img.copy(), r_img)
+        objects, distances, disparity_map = process_image(l_img.copy(), r_img)
 
         annotate_image(l_img, objects, distances)
 
         cv2.imwrite(join(processed_imgs_path, l_img_name), l_img)
+        # cv2.imwrite(join(processed_imgs_path, l_img_name + "_disparity.jpg"), false_colour(disparity_map))
 
 
 if __name__ == "__main__":

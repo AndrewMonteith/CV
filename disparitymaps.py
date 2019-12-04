@@ -17,6 +17,9 @@ def calc_disparity_map(gl_img, gr_img):
 
     _, disparity = cv2.threshold(disparity, 0, max_disparity * 16, cv2.THRESH_TOZERO)
     disparity = (disparity / 16.)
+
+    cv2.ximgproc.jointBilateralFilter(disparity, gl_img, 3, 1)
+
     return disparity
 
 
@@ -25,11 +28,14 @@ def take_subarray(arr, x, y, w, h):
 
     return arr[max(y, 0):min(y + h + 1, arr_h), max(x, 0):min(x + w + 1, arr_w)]
 
+
 def non_zero_mean(disparities):
     return disparities.sum() / np.count_nonzero(disparities)
 
+
 def kth_nonzero_percentile(disparities, k):
     return np.percentile(disparities[disparities != 0], k)
+
 
 # Compute Average depth based on mean of non-zero disparities
 def calc_depth(disparity, box):
