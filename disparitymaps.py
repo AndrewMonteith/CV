@@ -1,10 +1,6 @@
 import cv2
 import numpy as np
 
-# COULD_TEST: CHANGING VALUE OF NEIGHBOURHOOD SIZE 21
-# COULD_TEST: CHANGING VALUE OF MAX DISPARITY
-# COULD_COMMENT: WHICH DISPARITY VALUE TO USE FOR CALCULATING DISTANCE
-
 max_disparity = 128
 stereoProcessor = cv2.StereoSGBM_create(0, max_disparity, 21)  # 21 is block size of neighbours
 
@@ -17,8 +13,6 @@ def calc_disparity_map(gl_img, gr_img):
 
     _, disparity = cv2.threshold(disparity, 0, max_disparity * 16, cv2.THRESH_TOZERO)
     disparity = (disparity / 16.)
-
-    cv2.ximgproc.jointBilateralFilter(disparity, gl_img, 3, 1)
 
     return disparity
 
@@ -37,12 +31,11 @@ def kth_nonzero_percentile(disparities, k):
     return np.percentile(disparities[disparities != 0], k)
 
 
-# Compute Average depth based on mean of non-zero disparities
 def calc_depth(disparity, box):
     feature_disparities = take_subarray(disparity, *box)
 
     if not np.any(feature_disparities):
-        return -1
+        return 100_000_000  # too big for any featur
 
     feature_disparity = kth_nonzero_percentile(feature_disparities, 80)
 
