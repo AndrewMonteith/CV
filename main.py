@@ -77,8 +77,6 @@ def run_simulation():
 
         objects, distances, disparity_map = process_image(l_img.copy(), r_img)
 
-        print(disparity_map[:, 0])
-
         annotate_image(l_img, objects, distances)
 
         min_index = distances.index(min(distances))
